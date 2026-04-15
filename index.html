@@ -149,7 +149,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const state = { mode:'login', me:JSON.parse(localStorage.getItem('me') || 'null'), users:[], chats:[], activeUser:null, socket:null };
+    const state = { mode:'login', me:JSON.parse(localStorage.getItem('wt_me') || 'null'), users:[], chats:[], activeUser:null, socket:null };
     
 
 async function loadChats(){
@@ -179,7 +179,32 @@ async function loadChats(){
       hide('authError'); hide('authOk');
     }
     function setError(text){ $('authError').textContent = text; show('authError'); hide('authOk'); }
+function setError(text){ $('authError').textContent = text; }
 
+$('authBtn').onclick = async () => {
+  try {
+    const nick = $('nickInput').value.trim();
+    const password = $('passInput').value.trim();
+
+    const data = await api('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ nick, password })
+    });
+
+    state.me = data.user;
+    localStorage.setItem('wt_me', JSON.stringify(state.me));
+
+    hide('authScreen');
+    show('appScreen');
+
+    connectSocket();
+    loadChats();
+  } catch (e) {
+    setError(e.message);
+  }
+};
+
+async function api(url, options={}) {
     async function api(url, options={}){
       const res = await fetch(url, { headers:{ 'Content-Type':'application/json' }, ...options });
       const data = await res.json().catch(() => ({}));
@@ -496,7 +521,7 @@ async function loadChats(){
       $('meName').textContent = state.me.name;
       $('meNick').textContent = state.me.nick;
       connectSocket();
-      searchUsers();
+  loadChats();
     }
   </script>
 </body>
