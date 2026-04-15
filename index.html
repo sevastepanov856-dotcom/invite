@@ -178,7 +178,7 @@ async function loadChats(){
       $('authBtn').textContent = mode === 'login' ? 'Войти' : 'Создать аккаунт';
       hide('authError'); hide('authOk');
     }
-    function setError(text){ $('authError').textContent = text; show('authError'); hide('authOk'); }
+    
 function setError(text){ $('authError').textContent = text; }
 
 $('authBtn').onclick = async () => {
@@ -204,7 +204,7 @@ $('authBtn').onclick = async () => {
   }
 };
 
-async function api(url, options={}) {
+
     async function api(url, options={}){
       const res = await fetch(url, { headers:{ 'Content-Type':'application/json' }, ...options });
       const data = await res.json().catch(() => ({}));
@@ -213,40 +213,81 @@ async function api(url, options={}) {
     }
 
     function connectSocket(){
-      if (!state.me) return;
-      state.socket = io("https://invite-txa3.onrender.com");
-      state.socket.on('connect', () => {
-        state.socket.emit('auth', { userId: state.me.id });
-        if (state.activeUser) state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
+  if (!state.me) return;
+
+  state.socket = io("https://invite-txa3.onrender.com");
+
+  state.socket.on('connect', () => {
+    state.socket.emit('auth', { userId: state.me.id });
+
+    if (state.activeUser) {
+      state.socket.emit('join_chat', {
+        me: state.me.id,
+        user: state.activeUser.id
       });
-      state.socket.on('presence', (user) => {
-  const found = state.users.find(u => u.id === user.id);
-  if (found) Object.assign(found, user);
-  if (state.activeUser && state.activeUser.id === user.id) renderChats();
-});
-      state.socket.on('message', (msg) => {
-        if (!state.activeUser) return;
-        const ids = [msg.from, msg.to];
-        if (ids.includes(state.me.id) && ids.includes(state.activeUser.id)) appendMessage(msg);
-      });
-      state.socket.on('typing', ({ from, isTyping }) => {
-        if (state.activeUser && state.activeUser.id === from) $('typing').textContent = isTyping ? 'печатает...' : '';
-      });
-      state.socket.on('call:offer', async ({ from, offer, isVideo }) => {
-        const caller = state.users.find(u => u.id === from) || (state.activeUser?.id === from ? state.activeUser : null);
-        if (!caller) return;
-        const accept = confirm(`${caller.name} звонит тебе. Принять ${isVideo ? 'видеозвонок' : 'аудиозвонок'}?`);
-        if (!accept) { state.socket.emit('call:end', { from: state.me.id, to: from }); return; }
-        await startIncomingCall(from, offer, isVideo);
-      });
-      state.socket.on('call:answer', async ({ answer }) => {
-        if (state.peer) { await state.peer.setRemoteDescription(new RTCSessionDescription(answer)); $('callState').textContent = 'На связи'; }
-      });
-      state.socket.on('call:ice', async ({ candidate }) => {
-        try { if (state.peer && candidate) await state.peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
-      });
-      state.socket.on('call:end', () => endCall(true));
     }
+  });
+
+  state.socket.on('presence', (user) => {
+    const found = state.users.find(u => u.id === user.id);
+    if (found) Object.assign(found, user);
+
+    renderChats();
+    renderChatHeader();
+  });
+
+  state.socket.on('message', (msg) => {
+    if (!state.activeUser) return;
+
+    const ids = [msg.from, msg.to];
+    if (
+      ids.includes(state.me.id) &&
+      ids.includes(state.activeUser.id)
+    ) {
+      appendMessage(msg);
+    }
+  });
+
+  state.socket.on('typing', ({ from, isTyping }) => {
+    if (
+      state.activeUser &&
+      state.activeUser.id === from
+    ) {
+      $('typing').textContent = isTyping ? 'печатает...' : '';
+    }
+  });
+
+  state.socket.on('call:offer', async ({ from, offer, isVideo }) => {
+    const caller = state.users.find(u => u.id === from);
+    if (!caller) return;
+
+    const accept = confirm(`${caller.name} звонит`);
+    if (!accept) {
+      state.socket.emit('call:end', { to: from });
+      return;
+    }
+
+    await startIncomingCall(from, offer, isVideo);
+  });
+
+  state.socket.on('call:answer', async ({ answer }) => {
+    if (state.peer) {
+      await state.peer.setRemoteDescription(answer);
+    }
+  });
+
+  state.socket.on('call:ice', async ({ candidate }) => {
+    try {
+      if (state.peer && candidate) {
+        await state.peer.addIceCandidate(candidate);
+      }
+    } catch {}
+  });
+
+  state.socket.on('call:end', () => {
+    endCall(true);
+  });
+}
 
     async function searchUsers(q=''){
   if (!state.me) return;
