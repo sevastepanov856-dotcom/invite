@@ -149,7 +149,17 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const state = {mode:'login',me:JSON.parse(localStorage.getItem('wt_me')||'null'),activeUser:null,users:[],socket:null,typingTimer:null,peer:null,localStream:null,remoteStream:null,callTarget:null,isVideoCall:false,isMuted:false,camOff:false};
+    const state = { mode:'login', me:JSON.parse(localStorage.getItem('me') || 'null'), users:[], chats:[], activeUser:null, socket:null };
+    const state = { ... };
+
+async function loadChats(){
+  if (!state.me) return;
+  const data = await api('/api/chats?me=' + encodeURIComponent(state.me.id));
+  state.chats = data.chats || [];
+  renderChats();
+}
+
+const RTC_CONFIG = { ... }
     const RTC_CONFIG = { iceServers:[{ urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] }] };
     const $ = (id) => document.getElementById(id);
     const qs = (sel) => document.querySelector(sel);
@@ -221,24 +231,7 @@
       renderUsers();
     }
 
-    function renderUsers(){
-      $('userList').innerHTML = state.users.map(u => `
-        <div class="item ${state.activeUser && state.activeUser.id===u.id ? 'active':''}" data-id="${u.id}">
-          <div class="avatar">${initials(u.name)}</div>
-          <div><div style="font-weight:800">${esc(u.name)}</div><div class="preview">${esc(u.nick)}</div></div>
-          <div><span class="statusdot ${u.online ? 'on' : ''}"></span></div>
-        </div>`).join('');
-      [...$('userList').querySelectorAll('.item')].forEach(el => {
-        el.onclick = async () => {
-          state.activeUser = state.users.find(x => x.id === el.dataset.id);
-          renderUsers(); renderChatHeader(); $('messages').innerHTML=''; $('typing').textContent='';
-          if (state.socket) state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
-          const data = await api('/api/messages?me=' + encodeURIComponent(state.me.id) + '&other=' + encodeURIComponent(state.activeUser.id));
-          if (!data.messages.length) $('messages').innerHTML = '<div class="empty">Начни диалог первым.</div>';
-          else data.messages.forEach(appendMessage);
-        };
-      });
-    }
+    
 
     function renderChatHeader(){
       if (!state.activeUser) return;
@@ -247,7 +240,39 @@
       $('chatNick').textContent = state.activeUser.nick;
       $('chatDot').className = 'statusdot ' + (state.activeUser.online ? 'on' : '');
       $('chatStatus').textContent = state.activeUser.online ? 'online' : 'offline';
-    }
+    }function renderChats(){
+  $('userList').innerHTML = state.chats.map(u => `
+    <div class="item ${state.activeUser && state.activeUser.id===u.id ? 'active':''}" data-id="${u.id}">
+      <div class="avatar">${initials(u.name)}</div>
+      <div>
+        <div style="font-weight:800">${esc(u.name)}</div>
+        <div class="preview">${esc(u.nick)}</div>
+      </div>
+      <div><span class="statusdot ${u.online ? 'on' : ''}"></span></div>
+    </div>
+  `).join('');
+
+  [...$('userList').querySelectorAll('.item')].forEach(el => {
+    el.onclick = async () => {
+      state.activeUser = state.chats.find(x => x.id === el.dataset.id);
+      renderChats();
+      renderChatHeader();
+      $('messages').innerHTML = '';
+      $('typing').textContent = '';
+
+      if (state.socket) {
+        state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
+      }
+
+      const data = await api('/api/messages?me=' + encodeURIComponent(state.me.id) + '&other=' + encodeURIComponent(state.activeUser.id));
+      if (!data.messages.length) {
+        $('messages').innerHTML = '<div class="empty">Начни диалог первым.</div>';
+      } else {
+        data.messages.forEach(appendMessage);
+      }
+    };
+  });
+}
 
     function appendMessage(msg){
       const empty = $('messages').querySelector('.empty');
