@@ -179,7 +179,7 @@
 
     function connectSocket(){
       if (!state.me) return;
-      state.socket = io();
+      state.socket = io("https://invite-txa3.onrender.com");
       state.socket.on('connect', () => {
         state.socket.emit('auth', { userId: state.me.id });
         if (state.activeUser) state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
