@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>WaveTalk Calls</title>
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="WaveTalk" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
+  <style>
+    :root{--bg:#0b1020;--panel:#121a2e;--panel2:#18223a;--line:#27324f;--text:#e8edf8;--muted:#8b98b8;--accent:#6ea8fe;--accent2:#58d7ff;--good:#22c55e;--danger:#ef4444;--shadow:0 12px 30px rgba(0,0,0,.28);--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%}
+    body{margin:0;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Arial,sans-serif;background:radial-gradient(circle at top left, rgba(88,215,255,.08), transparent 30%),radial-gradient(circle at bottom right, rgba(110,168,254,.10), transparent 35%),var(--bg);overflow:hidden}
+    button,input,textarea{font:inherit}
+    .hidden{display:none !important}
+    .screen{height:100%;width:100%}
+    .center{min-height:100%;display:grid;place-items:center;padding:20px}
+    .card{width:min(520px,100%);background:rgba(18,26,46,.94);border:1px solid rgba(255,255,255,.06);border-radius:28px;box-shadow:var(--shadow);padding:22px}
+    .logo{width:72px;height:72px;border-radius:22px;display:grid;place-items:center;margin-bottom:18px;background:linear-gradient(135deg,var(--accent2),var(--accent));font-size:32px;font-weight:900;color:#08111f}
+    .muted{color:var(--muted)}
+    .stack{display:grid;gap:14px}
+    .field{display:grid;gap:8px}
+    input,textarea{width:100%;background:var(--panel2);border:1px solid transparent;color:var(--text);padding:14px 16px;border-radius:16px;outline:none}
+    input:focus,textarea:focus{border-color:var(--accent)}
+    button{border:none;cursor:pointer;border-radius:16px;padding:13px 16px;background:var(--panel2);color:var(--text)}
+    .primary{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#08111f;font-weight:800}
+    .danger{background:linear-gradient(135deg,#fb7185,#ef4444);color:white}
+    .authTabs,.row{display:flex;gap:8px;align-items:center}
+    .authTabs button{flex:1}
+    .app{height:100%;display:grid;grid-template-columns:320px 1fr}
+    .sidebar{border-right:1px solid var(--line);background:rgba(18,26,46,.88);display:flex;flex-direction:column;min-width:0;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
+    .main{min-width:0;display:flex;flex-direction:column;height:100%;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
+    .head{padding:14px 14px 12px;border-bottom:1px solid var(--line)}
+    .profile{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center}
+    .avatar{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#08111f;font-weight:900;box-shadow:var(--shadow)}
+    .search{padding:12px;border-bottom:1px solid var(--line)}
+    .list{padding:8px;overflow:auto;display:grid;gap:8px}
+    .item{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:12px;border-radius:18px;cursor:pointer}
+    .item.active,.item:hover{background:rgba(110,168,254,.10)}
+    .preview{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+    .statusdot{width:10px;height:10px;border-radius:50%;display:inline-block;background:#64748b}
+    .statusdot.on{background:var(--good)}
+    .chatHead{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:rgba(18,26,46,.88)}
+    .messages{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+    .msg{max-width:min(82%,720px);display:flex;gap:8px;align-items:flex-end}
+    .msg.me{align-self:flex-end;flex-direction:row-reverse}
+    .bubble{background:var(--panel2);padding:12px 14px;border-radius:18px 18px 18px 6px;box-shadow:var(--shadow);word-wrap:break-word}
+    .msg.me .bubble{background:linear-gradient(135deg,#58d7ff,#6ea8fe);color:#08111f;border-radius:18px 18px 6px 18px;font-weight:600}
+    .meta{font-size:11px;color:var(--muted);margin-top:4px}
+    .composer{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 14px;border-top:1px solid var(--line);background:rgba(18,26,46,.92)}
+    .composer textarea{min-height:48px;max-height:140px;resize:none}
+    .banner{padding:10px 12px;margin:12px 12px 0;border-radius:14px;background:rgba(110,168,254,.14);color:#cfe2ff;font-size:13px}
+    .typing{padding:0 16px 8px;color:var(--muted);font-size:13px;min-height:22px}
+    .empty{margin:auto;text-align:center;color:var(--muted);padding:24px}
+    .err{color:#fecaca;background:rgba(239,68,68,.12);padding:10px 12px;border-radius:12px;font-size:13px}
+    .ok{color:#bbf7d0;background:rgba(34,197,94,.12);padding:10px 12px;border-radius:12px;font-size:13px}
+    .callModal{position:fixed;inset:0;background:rgba(3,8,17,.92);display:grid;place-items:center;padding:18px;z-index:50}
+    .callCard{width:min(760px,100%);background:rgba(18,26,46,.98);border:1px solid rgba(255,255,255,.06);border-radius:28px;box-shadow:var(--shadow);padding:16px}
+    .videoWrap{display:grid;grid-template-columns:1fr 180px;gap:12px;align-items:start}
+    .videoMain,.videoSelf{background:#060b16;border-radius:20px;overflow:hidden;position:relative;min-height:240px}
+    .videoMain video,.videoSelf video{width:100%;height:100%;object-fit:cover;background:#060b16}
+    .callControls{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+    .pill{padding:8px 12px;border-radius:999px;background:rgba(110,168,254,.14);font-size:13px;color:#dbeafe;display:inline-block}
+    @media (max-width:860px){.app{grid-template-columns:1fr}.sidebar{display:none}.videoWrap{grid-template-columns:1fr}.videoSelf{min-height:140px}}
+  </style>
+</head>
+<body>
+  <section class="screen center" id="authScreen">
+    <div class="card stack">
+      <div class="logo">W</div>
+      <div class="stack" style="gap:8px">
+        <h1>WaveTalk</h1>
+        <p class="muted">Реальный чат + браузерные звонки через WebRTC.</p>
+      </div>
+      <div class="banner">Для iPhone: открой сайт в Safari, разреши микрофон и камеру при звонке.</div>
+      <div class="authTabs">
+        <button id="tabLogin" class="primary">Вход</button>
+        <button id="tabRegister">Регистрация</button>
+      </div>
+      <div id="authError" class="hidden err"></div>
+      <div id="authOk" class="hidden ok"></div>
+      <div class="field" id="nameField"><input id="nameInput" placeholder="Имя" /></div>
+      <div class="field"><input id="nickInput" placeholder="@nick" autocapitalize="none" /></div>
+      <div class="field"><input id="passInput" type="password" placeholder="Пароль" /></div>
+      <div class="field" id="emailField"><input id="emailInput" type="email" placeholder="E-mail для уведомлений о звонке" /></div>
+      <button class="primary" id="authBtn">Войти</button>
+    </div>
+  </section>
+
+  <section class="screen hidden" id="appScreen">
+    <div class="app">
+      <aside class="sidebar">
+        <div class="head">
+          <div class="profile">
+            <div class="avatar" id="meAvatar">ME</div>
+            <div><div id="meName" style="font-weight:800"></div><div class="muted" id="meNick"></div></div>
+            <button id="logoutBtn">⎋</button>
+          </div>
+        </div>
+        <div class="search"><input id="searchInput" placeholder="Поиск по имени или @нику" /></div>
+        <div class="list" id="userList"></div>
+      </aside>
+
+      <main class="main">
+        <div class="chatHead">
+          <div class="profile" style="grid-template-columns:48px 1fr">
+            <div class="avatar" id="chatAvatar">?</div>
+            <div><div id="chatName" style="font-weight:800">Выбери диалог</div><div class="muted" id="chatNick">Найди человека по нику</div></div>
+          </div>
+          <div class="row">
+            <span class="statusdot" id="chatDot"></span>
+            <span class="muted" id="chatStatus">offline</span>
+            <button id="voiceCallBtn">📞</button>
+            <button id="videoCallBtn">🎥</button>
+          </div>
+        </div>
+        <div class="messages" id="messages"><div class="empty">Войди, найди друга и начни переписку.</div></div>
+        <div class="typing" id="typing"></div>
+        <form class="composer">
+          <textarea id="messageInput" placeholder="Сообщение..."></textarea>
+          <button class="primary" id="sendBtn" type="submit">Отправить</button>
+        </form>
+      </main>
+    </div>
+  </section>
+
+  <section class="callModal hidden" id="callModal">
+    <div class="callCard">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+        <div><div id="callTitle" style="font-weight:800;font-size:20px">Звонок</div><div id="callState" class="muted">Подключение...</div></div>
+        <div class="pill" id="callTypePill">Аудио</div>
+      </div>
+      <div class="videoWrap">
+        <div class="videoMain"><video id="remoteVideo" autoplay playsinline></video></div>
+        <div class="videoSelf"><video id="localVideo" autoplay muted playsinline></video></div>
+      </div>
+      <div class="callControls">
+        <button id="muteBtn">🎤 Микрофон</button>
+        <button id="camBtn">📷 Камера</button>
+        <button id="speakerBtn">🔊 Динамик</button>
+        <button class="danger" id="endCallBtn">Завершить</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const state = {mode:'login',me:JSON.parse(localStorage.getItem('wt_me')||'null'),activeUser:null,users:[],socket:null,typingTimer:null,peer:null,localStream:null,remoteStream:null,callTarget:null,isVideoCall:false,isMuted:false,camOff:false};
+    const RTC_CONFIG = { iceServers:[{ urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] }] };
+    const $ = (id) => document.getElementById(id);
+    const qs = (sel) => document.querySelector(sel);
+    const esc = (s) => String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    const initials = (v) => (v || '?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+    const fmtTime = (iso) => new Date(iso).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    const show = (id) => $(id).classList.remove('hidden');
+    const hide = (id) => $(id).classList.add('hidden');
+
+    function setAuthMode(mode){
+      state.mode = mode;
+      $('tabLogin').className = mode === 'login' ? 'primary' : '';
+      $('tabRegister').className = mode === 'register' ? 'primary' : '';
+      $('nameField').style.display = mode === 'register' ? 'grid' : 'none';
+      if ($('emailField')) $('emailField').style.display = mode === 'register' ? 'grid' : 'none';
+      $('authBtn').textContent = mode === 'login' ? 'Войти' : 'Создать аккаунт';
+      hide('authError'); hide('authOk');
+    }
+    function setError(text){ $('authError').textContent = text; show('authError'); hide('authOk'); }
+
+    async function api(url, options={}){
+      const res = await fetch(url, { headers:{ 'Content-Type':'application/json' }, ...options });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Ошибка запроса');
+      return data;
+    }
+
+    function connectSocket(){
+      if (!state.me) return;
+      state.socket = io();
+      state.socket.on('connect', () => {
+        state.socket.emit('auth', { userId: state.me.id });
+        if (state.activeUser) state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
+      });
+      state.socket.on('presence', (user) => {
+        const found = state.users.find(u => u.id === user.id);
+        if (found) Object.assign(found, user);
+        if (state.activeUser && state.activeUser.id === user.id) { state.activeUser = { ...state.activeUser, ...user }; renderChatHeader(); }
+        renderUsers();
+      });
+      state.socket.on('message', (msg) => {
+        if (!state.activeUser) return;
+        const ids = [msg.from, msg.to];
+        if (ids.includes(state.me.id) && ids.includes(state.activeUser.id)) appendMessage(msg);
+      });
+      state.socket.on('typing', ({ from, isTyping }) => {
+        if (state.activeUser && state.activeUser.id === from) $('typing').textContent = isTyping ? 'печатает...' : '';
+      });
+      state.socket.on('call:offer', async ({ from, offer, isVideo }) => {
+        const caller = state.users.find(u => u.id === from) || (state.activeUser?.id === from ? state.activeUser : null);
+        if (!caller) return;
+        const accept = confirm(`${caller.name} звонит тебе. Принять ${isVideo ? 'видеозвонок' : 'аудиозвонок'}?`);
+        if (!accept) { state.socket.emit('call:end', { from: state.me.id, to: from }); return; }
+        await startIncomingCall(from, offer, isVideo);
+      });
+      state.socket.on('call:answer', async ({ answer }) => {
+        if (state.peer) { await state.peer.setRemoteDescription(new RTCSessionDescription(answer)); $('callState').textContent = 'На связи'; }
+      });
+      state.socket.on('call:ice', async ({ candidate }) => {
+        try { if (state.peer && candidate) await state.peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
+      });
+      state.socket.on('call:end', () => endCall(true));
+    }
+
+    async function searchUsers(q=''){
+      if (!state.me) return;
+      const data = await api('/api/search?q=' + encodeURIComponent(q) + '&me=' + encodeURIComponent(state.me.id));
+      state.users = data.users;
+      renderUsers();
+    }
+
+    function renderUsers(){
+      $('userList').innerHTML = state.users.map(u => `
+        <div class="item ${state.activeUser && state.activeUser.id===u.id ? 'active':''}" data-id="${u.id}">
+          <div class="avatar">${initials(u.name)}</div>
+          <div><div style="font-weight:800">${esc(u.name)}</div><div class="preview">${esc(u.nick)}</div></div>
+          <div><span class="statusdot ${u.online ? 'on' : ''}"></span></div>
+        </div>`).join('');
+      [...$('userList').querySelectorAll('.item')].forEach(el => {
+        el.onclick = async () => {
+          state.activeUser = state.users.find(x => x.id === el.dataset.id);
+          renderUsers(); renderChatHeader(); $('messages').innerHTML=''; $('typing').textContent='';
+          if (state.socket) state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
+          const data = await api('/api/messages?me=' + encodeURIComponent(state.me.id) + '&other=' + encodeURIComponent(state.activeUser.id));
+          if (!data.messages.length) $('messages').innerHTML = '<div class="empty">Начни диалог первым.</div>';
+          else data.messages.forEach(appendMessage);
+        };
+      });
+    }
+
+    function renderChatHeader(){
+      if (!state.activeUser) return;
+      $('chatAvatar').textContent = initials(state.activeUser.name);
+      $('chatName').textContent = state.activeUser.name;
+      $('chatNick').textContent = state.activeUser.nick;
+      $('chatDot').className = 'statusdot ' + (state.activeUser.online ? 'on' : '');
+      $('chatStatus').textContent = state.activeUser.online ? 'online' : 'offline';
+    }
+
+    function appendMessage(msg){
+      const empty = $('messages').querySelector('.empty');
+      if (empty) empty.remove();
+      const me = msg.from === state.me.id;
+      const wrap = document.createElement('div');
+      wrap.className = 'msg ' + (me ? 'me' : '');
+      wrap.innerHTML = `<div class="avatar">${me ? initials(state.me.name) : initials(state.activeUser?.name || '?')}</div><div><div class="bubble">${esc(msg.text).replace(/\n/g,'<br>')}</div><div class="meta">${fmtTime(msg.time)}</div></div>`;
+      $('messages').appendChild(wrap);
+      $('messages').scrollTop = $('messages').scrollHeight;
+    }
+
+    async function handleAuth(){
+      const name = $('nameInput').value.trim();
+      const nick = $('nickInput').value.trim();
+      const password = $('passInput').value;
+      const email = $('emailInput') ? $('emailInput').value.trim() : '';
+      try {
+        let data;
+        if (state.mode === 'register') data = await api('/api/register', { method:'POST', body:JSON.stringify({ name, nick, password, email }) });
+        else data = await api('/api/login', { method:'POST', body:JSON.stringify({ nick, password }) });
+        state.me = data.user;
+        localStorage.setItem('wt_me', JSON.stringify(state.me));
+        hide('authScreen'); show('appScreen');
+        $('meAvatar').textContent = initials(state.me.name);
+        $('meName').textContent = state.me.name;
+        $('meNick').textContent = state.me.nick;
+        connectSocket();
+        searchUsers();
+      } catch (e) { setError(e.message); }
+    }
+
+    function autoResize(){
+      const t = $('messageInput');
+      t.style.height = 'auto';
+      t.style.height = Math.min(t.scrollHeight, 140) + 'px';
+    }
+
+    async function ensureMedia(isVideo){
+      if (state.localStream) return state.localStream;
+      state.localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:!!isVideo });
+      $('localVideo').srcObject = state.localStream;
+      return state.localStream;
+    }
+
+    function resetPeer(){
+      if (state.peer) { try { state.peer.onicecandidate = null; state.peer.ontrack = null; state.peer.close(); } catch(e) {} }
+      state.peer = null;
+    }
+
+    async function createPeer(targetId){
+      resetPeer();
+      state.remoteStream = new MediaStream();
+      $('remoteVideo').srcObject = state.remoteStream;
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      state.peer = pc;
+      pc.onicecandidate = (event) => {
+        if (event.candidate) state.socket.emit('call:ice', { from: state.me.id, to: targetId, candidate: event.candidate });
+      };
+      pc.ontrack = (event) => event.streams[0].getTracks().forEach(track => state.remoteStream.addTrack(track));
+      state.localStream.getTracks().forEach(track => pc.addTrack(track, state.localStream));
+      return pc;
+    }
+
+    async function startOutgoingCall(isVideo){
+      if (!state.activeUser) return alert('Сначала выбери чат');
+      if (!state.activeUser.online) return alert('Пользователь не в сети');
+      try {
+        state.isVideoCall = !!isVideo;
+        state.callTarget = state.activeUser.id;
+        $('callTypePill').textContent = isVideo ? 'Видео' : 'Аудио';
+        $('callTitle').textContent = `${isVideo ? 'Видеозвонок' : 'Звонок'} · ${state.activeUser.name}`;
+        $('callState').textContent = 'Звоним...';
+        show('callModal');
+        await ensureMedia(isVideo);
+        const pc = await createPeer(state.activeUser.id);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        state.socket.emit('call:offer', { from: state.me.id, to: state.activeUser.id, offer, isVideo: !!isVideo });
+      } catch (e) {
+        endCall(true);
+        alert('Не удалось начать звонок. Проверь доступ к микрофону и камере.');
+      }
+    }
+
+    async function startIncomingCall(from, offer, isVideo){
+      try {
+        state.isVideoCall = !!isVideo;
+        state.callTarget = from;
+        const caller = state.users.find(u => u.id === from) || state.activeUser;
+        $('callTypePill').textContent = isVideo ? 'Видео' : 'Аудио';
+        $('callTitle').textContent = `${isVideo ? 'Видеозвонок' : 'Звонок'} · ${caller ? caller.name : 'Пользователь'}`;
+        $('callState').textContent = 'Подключаем...';
+        show('callModal');
+        await ensureMedia(isVideo);
+        const pc = await createPeer(from);
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        state.socket.emit('call:answer', { from: state.me.id, to: from, answer });
+        $('callState').textContent = 'На связи';
+      } catch (e) {
+        endCall(true);
+        alert('Не удалось принять звонок.');
+      }
+    }
+
+    function stopLocalTracks(){
+      if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
+      state.localStream = null;
+      state.remoteStream = null;
+      $('localVideo').srcObject = null;
+      $('remoteVideo').srcObject = null;
+    }
+
+    function endCall(remoteOnly=false){
+      if (!remoteOnly && state.socket && state.callTarget) state.socket.emit('call:end', { from: state.me.id, to: state.callTarget });
+      resetPeer();
+      stopLocalTracks();
+      state.callTarget = null;
+      state.isVideoCall = false;
+      state.isMuted = false;
+      state.camOff = false;
+      $('muteBtn').textContent = '🎤 Микрофон';
+      $('camBtn').textContent = '📷 Камера';
+      $('speakerBtn').textContent = '🔊 Динамик';
+      $('remoteVideo').muted = false;
+      hide('callModal');
+    }
+
+    async function sendMessage(e){
+      e.preventDefault();
+      if (!state.activeUser || !state.socket) return;
+      const text = $('messageInput').value.trim();
+      if (!text) return;
+      state.socket.emit('message', { from: state.me.id, to: state.activeUser.id, text });
+      $('messageInput').value = '';
+      autoResize();
+      state.socket.emit('typing', { me: state.me.id, other: state.activeUser.id, isTyping:false });
+    }
+
+    function wire(){
+      $('tabLogin').onclick = () => setAuthMode('login');
+      $('tabRegister').onclick = () => setAuthMode('register');
+      $('authBtn').onclick = handleAuth;
+      $('logoutBtn').onclick = () => { localStorage.removeItem('wt_me'); location.reload(); };
+      $('searchInput').addEventListener('input', (e) => searchUsers(e.target.value));
+      qs('.composer').addEventListener('submit', sendMessage);
+      $('messageInput').addEventListener('input', () => {
+        autoResize();
+        if (state.activeUser && state.socket) {
+          state.socket.emit('typing', { me: state.me.id, other: state.activeUser.id, isTyping:true });
+          clearTimeout(state.typingTimer);
+          state.typingTimer = setTimeout(() => state.socket.emit('typing', { me: state.me.id, other: state.activeUser.id, isTyping:false }), 900);
+        }
+      });
+      $('voiceCallBtn').onclick = () => startOutgoingCall(false);
+      $('videoCallBtn').onclick = () => startOutgoingCall(true);
+      $('endCallBtn').onclick = () => endCall(false);
+      $('muteBtn').onclick = () => {
+        if (!state.localStream) return;
+        state.isMuted = !state.isMuted;
+        state.localStream.getAudioTracks().forEach(t => t.enabled = !state.isMuted);
+        $('muteBtn').textContent = state.isMuted ? '🔇 Без звука' : '🎤 Микрофон';
+      };
+      $('camBtn').onclick = () => {
+        if (!state.localStream) return;
+        const tracks = state.localStream.getVideoTracks();
+        if (!tracks.length) return;
+        state.camOff = !state.camOff;
+        tracks.forEach(t => t.enabled = !state.camOff);
+        $('camBtn').textContent = state.camOff ? '🚫 Камера выкл' : '📷 Камера';
+      };
+      $('speakerBtn').onclick = () => {
+        $('remoteVideo').muted = !$('remoteVideo').muted;
+        $('speakerBtn').textContent = $('remoteVideo').muted ? '🔈 Тихо' : '🔊 Динамик';
+      };
+    }
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    wire();
+    setAuthMode('login');
+    if (state.me) {
+      hide('authScreen'); show('appScreen');
+      $('meAvatar').textContent = initials(state.me.name);
+      $('meName').textContent = state.me.name;
+      $('meNick').textContent = state.me.nick;
+      connectSocket();
+      searchUsers();
+    }
+  </script>
+</body>
+</html>
