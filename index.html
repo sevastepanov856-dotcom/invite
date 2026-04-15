@@ -150,7 +150,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const state = { mode:'login', me:JSON.parse(localStorage.getItem('me') || 'null'), users:[], chats:[], activeUser:null, socket:null };
-    const state = { ... };
+    
 
 async function loadChats(){
   if (!state.me) return;
@@ -159,7 +159,7 @@ async function loadChats(){
   renderChats();
 }
 
-const RTC_CONFIG = { ... }
+
     const RTC_CONFIG = { iceServers:[{ urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] }] };
     const $ = (id) => document.getElementById(id);
     const qs = (sel) => document.querySelector(sel);
