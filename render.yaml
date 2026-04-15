@@ -1,0 +1,1 @@
+services:\n  - type: web\n    name: wavetalk-calls\n    runtime: node\n    plan: free\n    buildCommand: npm install\n    startCommand: npm start\n    autoDeploy: true\n

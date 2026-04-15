@@ -1,0 +1,15 @@
+{
+  "name": "wavetalk-with-calls",
+  "version": "1.0.0",
+  "description": "Deployable messenger with chat and WebRTC calls",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "nodemailer": "^6.10.1",
+    "dotenv": "^16.4.5"
+  }
+}
