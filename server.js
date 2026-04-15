@@ -238,7 +238,61 @@ app.get('/api/messages', (req,res) => {
   if (!me || !other) return res.status(400).json({ error:'me and other required' });
   res.json({ ok:true, messages: conversations.get(convoId(String(me), String(other))) || [] });
 });
+app.post('/api/messages', async (req, res) => {
+  try {
+    const { from, to, text, type, image, audio } = req.body || {};
 
+    if (!from || !to) {
+      return res.status(400).json({ error: 'from/to required' });
+    }
+
+    const sender = users.get(from);
+    const target = users.get(to);
+    if (!sender || !target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const msg = {
+      id: makeId(),
+      from,
+      to,
+      text: text || '',
+      type: type || 'text',
+      image: image || null,
+      audio: audio || null,
+      time: new Date().toISOString(),
+      updatedAt: null,
+      isDeleted: false,
+      readAt: null
+    };
+
+    const id = convoId(from, to);
+    const arr = conversations.get(id) || [];
+    arr.push(msg);
+    conversations.set(id, arr);
+
+    io.to(`chat:${id}`).emit('message', msg);
+    io.to(`user:${from}`).emit('chats:update');
+    io.to(`user:${to}`).emit('chats:update');
+
+    try {
+      if (sender && target?.email && msg.type === 'text' && msg.text) {
+        await sendIncomingMessageEmail({
+          senderName: sender.name,
+          senderNick: sender.nick,
+          targetEmail: target.email,
+          text: msg.text
+        });
+      }
+    } catch (err) {
+      console.error('Message email send failed:', err.message);
+    }
+
+    res.json({ ok: true, message: msg });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 app.post('/api/read', (req,res) => {
   const { me, other } = req.body || {};
   if (!me || !other) return res.status(400).json({ error:'me and other required' });
