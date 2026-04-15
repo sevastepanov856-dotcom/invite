@@ -195,11 +195,10 @@ const RTC_CONFIG = { ... }
         if (state.activeUser) state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
       });
       state.socket.on('presence', (user) => {
-        const found = state.users.find(u => u.id === user.id);
-        if (found) Object.assign(found, user);
-        if (state.activeUser && state.activeUser.id === user.id) { state.activeUser = { ...state.activeUser, ...user }; renderChatHeader(); }
-        renderUsers();
-      });
+  const found = state.users.find(u => u.id === user.id);
+  if (found) Object.assign(found, user);
+  if (state.activeUser && state.activeUser.id === user.id) renderChats();
+});
       state.socket.on('message', (msg) => {
         if (!state.activeUser) return;
         const ids = [msg.from, msg.to];
@@ -225,11 +224,47 @@ const RTC_CONFIG = { ... }
     }
 
     async function searchUsers(q=''){
-      if (!state.me) return;
-      const data = await api('/api/search?q=' + encodeURIComponent(q) + '&me=' + encodeURIComponent(state.me.id));
-      state.users = data.users;
-      renderUsers();
-    }
+  if (!state.me) return;
+
+  if (!q.trim()) {
+    renderChats();
+    return;
+  }
+
+  const data = await api('/api/search?q=' + encodeURIComponent(q) + '&me=' + encodeURIComponent(state.me.id));
+  state.users = data.users || [];
+
+  $('userList').innerHTML = state.users.map(u => `
+    <div class="item" data-id="${u.id}">
+      <div class="avatar">${initials(u.name)}</div>
+      <div>
+        <div style="font-weight:800">${esc(u.name)}</div>
+        <div class="preview">${esc(u.nick)}</div>
+      </div>
+      <div><span class="statusdot ${u.online ? 'on' : ''}"></span></div>
+    </div>
+  `).join('');
+
+  [...$('userList').querySelectorAll('.item')].forEach(el => {
+    el.onclick = async () => {
+      const found = state.users.find(x => x.id === el.dataset.id);
+      if (!found) return;
+
+      if (!state.chats.some(c => c.id === found.id)) {
+        state.chats.unshift(found);
+      }
+
+      state.activeUser = found;
+      renderChats();
+      renderChatHeader();
+      $('messages').innerHTML = '<div class="empty">Начни диалог первым.</div>';
+
+      if (state.socket) {
+        state.socket.emit('join_chat', { me: state.me.id, other: state.activeUser.id });
+      }
+    };
+  });
+}
 
     
 
