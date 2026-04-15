@@ -11,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(__dirname));
 
 const users = new Map();
@@ -25,7 +25,21 @@ function normalizeNick(nick){
   return raw.startsWith('@') ? raw : '@' + raw;
 }
 function publicUser(u){
-  return { id:u.id, name:u.name, nick:u.nick, online:!!u.online, email:u.email || '' };
+  return {
+    id:u.id,
+    name:u.name,
+    nick:u.nick,
+    online:!!u.online,
+    email:u.email || '',
+    avatar:u.avatar || '',
+    lastSeenAt:u.lastSeenAt || null
+  };
+}
+function safeImageDataUrl(v){
+  const s = String(v || '');
+  if (!s.startsWith('data:image/')) return '';
+  if (s.length > 2_000_000) return '';
+  return s;
 }
 
 function createMailer() {
@@ -76,7 +90,6 @@ async function sendIncomingCallEmail({ callerName, callerNick, targetEmail, isVi
   });
   return true;
 }
-
 
 async function sendIncomingMessageEmail({ senderName, senderNick, targetEmail, text }) {
   if (!mailer || !targetEmail) return false;
@@ -130,6 +143,7 @@ app.post('/api/register', (req,res) => {
   if (usersByNick.has(normalizedNick)) {
     return res.status(409).json({ error:'Этот ник уже занят' });
   }
+
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const id = makeId();
   const user = {
@@ -138,8 +152,10 @@ app.post('/api/register', (req,res) => {
     nick:normalizedNick,
     password:String(password),
     email: normalizedEmail,
+    avatar:'',
     online:false,
-    socketId:null
+    socketId:null,
+    lastSeenAt:null
   };
   users.set(id, user);
   usersByNick.set(normalizedNick, id);
@@ -156,6 +172,19 @@ app.post('/api/login', (req,res) => {
   res.json({ ok:true, user:publicUser(user) });
 });
 
+app.patch('/api/profile/avatar', (req,res) => {
+  const { me, avatar } = req.body || {};
+  const user = users.get(String(me || ''));
+  if (!user) return res.status(404).json({ error:'Пользователь не найден' });
+
+  const safe = safeImageDataUrl(avatar);
+  if (!safe) return res.status(400).json({ error:'Нужна картинка до 2MB' });
+
+  user.avatar = safe;
+  io.emit('profile:update', publicUser(user));
+  res.json({ ok:true, user:publicUser(user) });
+});
+
 app.get('/api/search', (req,res) => {
   const q = String(req.query.q || '').trim().toLowerCase();
   const me = String(req.query.me || '');
@@ -167,10 +196,126 @@ app.get('/api/search', (req,res) => {
   res.json({ ok:true, users:list });
 });
 
+app.get('/api/chats', (req,res) => {
+  const me = String(req.query.me || '');
+  if (!me) return res.status(400).json({ error:'me required' });
+
+  const chatIds = new Set();
+  for (const [id, arr] of conversations.entries()) {
+    if (!arr.length) continue;
+    const parts = id.split(':');
+    if (parts.includes(me)) {
+      const other = parts[0] === me ? parts[1] : parts[0];
+      chatIds.add(other);
+    }
+  }
+
+  const chats = [...chatIds].map(id => {
+    const u = users.get(id);
+    if (!u) return null;
+    const cid = convoId(me, id);
+    const arr = conversations.get(cid) || [];
+    const last = arr[arr.length - 1];
+    const unread = arr.filter(m => m.to === me && !m.readAt && !m.isDeleted).length;
+
+    return {
+      ...publicUser(u),
+      lastText: last ? (last.isDeleted ? 'Сообщение удалено' : last.text) : '',
+      lastTime: last ? last.time : null,
+      unreadCount: unread
+    };
+  }).filter(Boolean).sort((a,b) => {
+    const ta = a.lastTime ? new Date(a.lastTime).getTime() : 0;
+    const tb = b.lastTime ? new Date(b.lastTime).getTime() : 0;
+    return tb - ta;
+  });
+
+  res.json({ ok:true, chats });
+});
+
 app.get('/api/messages', (req,res) => {
   const { me, other } = req.query;
   if (!me || !other) return res.status(400).json({ error:'me and other required' });
   res.json({ ok:true, messages: conversations.get(convoId(String(me), String(other))) || [] });
+});
+
+app.post('/api/read', (req,res) => {
+  const { me, other } = req.body || {};
+  if (!me || !other) return res.status(400).json({ error:'me and other required' });
+
+  const id = convoId(String(me), String(other));
+  const arr = conversations.get(id) || [];
+  const now = new Date().toISOString();
+
+  let changed = false;
+  for (const m of arr) {
+    if (m.to === me && !m.readAt && !m.isDeleted) {
+      m.readAt = now;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    io.to(`chat:${id}`).emit('messages:read', { reader: me, at: now });
+  }
+
+  res.json({ ok:true, readAt: now });
+});
+
+app.patch('/api/messages/:mid', (req,res) => {
+  const { me, text } = req.body || {};
+  const mid = String(req.params.mid || '');
+  if (!me || !text) return res.status(400).json({ error:'me and text required' });
+
+  let found = null;
+  let key = null;
+
+  for (const [cid, arr] of conversations.entries()) {
+    const m = arr.find(x => x.id === mid);
+    if (m) {
+      found = m;
+      key = cid;
+      break;
+    }
+  }
+
+  if (!found) return res.status(404).json({ error:'Сообщение не найдено' });
+  if (found.from !== me) return res.status(403).json({ error:'Нельзя менять чужое сообщение' });
+  if (found.isDeleted) return res.status(400).json({ error:'Сообщение уже удалено' });
+
+  found.text = String(text).slice(0, 4000);
+  found.updatedAt = new Date().toISOString();
+
+  io.to(`chat:${key}`).emit('message:update', found);
+  res.json({ ok:true, message: found });
+});
+
+app.delete('/api/messages/:mid', (req,res) => {
+  const me = String(req.body.me || req.query.me || '');
+  const mid = String(req.params.mid || '');
+  if (!me) return res.status(400).json({ error:'me required' });
+
+  let found = null;
+  let key = null;
+
+  for (const [cid, arr] of conversations.entries()) {
+    const m = arr.find(x => x.id === mid);
+    if (m) {
+      found = m;
+      key = cid;
+      break;
+    }
+  }
+
+  if (!found) return res.status(404).json({ error:'Сообщение не найдено' });
+  if (found.from !== me) return res.status(403).json({ error:'Нельзя удалить чужое сообщение' });
+
+  found.isDeleted = true;
+  found.text = 'Сообщение удалено';
+  found.updatedAt = new Date().toISOString();
+
+  io.to(`chat:${key}`).emit('message:update', found);
+  res.json({ ok:true });
 });
 
 io.on('connection', (socket) => {
@@ -197,12 +342,25 @@ io.on('connection', (socket) => {
 
   socket.on('message', async ({ from, to, text }) => {
     if (!from || !to || !text) return;
-    const msg = { from, to, text:String(text).slice(0, 4000), time:new Date().toISOString() };
+    const msg = {
+      id: makeId(),
+      from,
+      to,
+      text:String(text).slice(0, 4000),
+      time:new Date().toISOString(),
+      updatedAt:null,
+      isDeleted:false,
+      readAt:null
+    };
+
     const id = convoId(from, to);
     const arr = conversations.get(id) || [];
     arr.push(msg);
     conversations.set(id, arr);
+
     io.to(`chat:${id}`).emit('message', msg);
+    io.to(`user:${from}`).emit('chats:update');
+    io.to(`user:${to}`).emit('chats:update');
 
     try {
       const sender = users.get(from);
@@ -264,10 +422,11 @@ io.on('connection', (socket) => {
     if (user) {
       user.online = false;
       user.socketId = null;
+      user.lastSeenAt = new Date().toISOString();
       io.emit('presence', publicUser(user));
     }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('WaveTalk with calls + email on http://localhost:' + PORT));
+server.listen(PORT, () => console.log('WaveTalk big server on http://localhost:' + PORT));
